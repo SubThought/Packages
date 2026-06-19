@@ -1,0 +1,191 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;;
+;;; ros.package — ROS 2 Protocol Functions
+;;;
+;;; Shared functions for any ROS 2-compliant robot.  All tell/ask calls
+;;; go through the ros-io provider (RosIO.dll) which speaks rosbridge
+;;; WebSocket.  Connection handles are obtained via (open "ros://host:9090").
+;;;
+;;; All robot-specific adapter packages build on this package.
+;;;
+
+(package ROS {1 0 0}
+
+  memo "ROS 2 protocol — shared functions for all ROS 2 robots."
+  requires {ros-io}
+
+
+  ;;; §1  HELPERS
+
+  (function ros-default {variant ?value variant ?fallback}
+    (if (nil-p ?value) ?fallback else ?value))
+
+
+  ;;; §2  CONNECTION
+  ;;;
+  ;;; Opens through the ros-io provider.  The scheme "ros://" routes
+  ;;; to RosIO.TryOpen which connects via WebSocket to rosbridge.
+
+  (function ros-open {string ?url idiom ?options}
+    (var ?ros-url (if (has ?url "ros://") ?url
+                    else ($ "ros://" ?url)))
+    (var ?conn (open ?ros-url ?options))
+    (when (nil-p ?conn)
+      (signal Failure :Text ($ "ROS2: could not connect to" ?url)))
+    ?conn)
+
+  (function ros-close {?handle}
+    (close ?handle)
+    closed)
+
+  (function ros-status {?handle}
+    (var ?s (ask ?handle {topic "/rosout"}))
+    {:Status (if (nil-p ?s) disconnected else connected) :Adapter ros2})
+
+
+  ;;; §3  VISUAL — cameras, depth, LIDAR
+  ;;;
+  ;;; Each ask goes through RosIO.TryAsk which subscribes to the
+  ;;; rosbridge topic and returns the next message as a Premise idiom.
+
+  (function ros-camera-read {?handle string ?topic}
+    (ask ?handle {topic ?topic :type "sensor_msgs/Image"}))
+
+  (function ros-depth-read {?handle string ?topic}
+    (ask ?handle {topic ?topic :type "sensor_msgs/Image"}))
+
+  (function ros-lidar-read {?handle string ?topic}
+    (ask ?handle {topic ?topic :type "sensor_msgs/LaserScan"}))
+
+  (function ros-point-cloud-read {?handle string ?topic}
+    (ask ?handle {topic ?topic :type "sensor_msgs/PointCloud2"}))
+
+
+  ;;; §4  AUDITORY
+
+  (function ros-audio-read {?handle string ?topic}
+    (ask ?handle {topic ?topic :type "audio_msgs/Audio"}))
+
+
+  ;;; §5  PROPRIOCEPTIVE — joints, IMU, battery
+
+  (function ros-joint-states {?handle}
+    (ask ?handle {topic "/joint_states" :type "sensor_msgs/JointState"}))
+
+  (function ros-imu-read {?handle string ?topic}
+    (ask ?handle {topic (ros-default ?topic "/imu") :type "sensor_msgs/Imu"}))
+
+  (function ros-battery-read {?handle string ?topic}
+    (ask ?handle {topic (ros-default ?topic "/battery") :type "sensor_msgs/BatteryState"}))
+
+
+  ;;; §6  HAPTIC — force/torque, contact
+
+  (function ros-ft-read {?handle string ?topic}
+    (ask ?handle {topic ?topic :type "geometry_msgs/WrenchStamped"}))
+
+  (function ros-bumper-read {?handle string ?topic}
+    (ask ?handle {topic ?topic :type "std_msgs/Bool"}))
+
+
+  ;;; §7  SPATIAL — odometry, pose, TF, map
+
+  (function ros-odom-read {?handle}
+    (ask ?handle {topic "/odom" :type "nav_msgs/Odometry"}))
+
+  (function ros-pose-read {?handle string ?topic}
+    (ask ?handle {topic (ros-default ?topic "/pose") :type "geometry_msgs/PoseStamped"}))
+
+  (function ros-tf-read {?handle string ?source string ?target}
+    (ask ?handle {service "/tf2/lookup_transform" :source ?source :target ?target}))
+
+  (function ros-map-read {?handle}
+    (ask ?handle {topic "/map" :type "nav_msgs/OccupancyGrid"}))
+
+
+  ;;; §8  LOCOMOTION — cmd_vel, navigation
+  ;;;
+  ;;; tell goes through RosIO.TryTell which publishes to the topic.
+  ;;; ask goes through RosIO.TryAsk which sends an action goal and
+  ;;; waits for the result.
+
+  (function ros-cmd-vel {?handle real ?linear real ?angular}
+    (tell ?handle {topic "/cmd_vel" :type "geometry_msgs/Twist"
+                   :linear {:x ?linear :y 0.0 :z 0.0}
+                   :angular {:x 0.0 :y 0.0 :z ?angular}})
+    {:Status moving})
+
+  (function ros-navigate {?handle idiom ?goal}
+    (ask ?handle {action "/navigate_to_pose" :type "nav2_msgs/NavigateToPose"
+                  :goal {:position {:x (:X ?goal) :y (:Y ?goal) :z 0.0}
+                         :orientation {:yaw (:Yaw ?goal)}
+                         :frame_id (ros-default (:FrameId ?goal) "map")}}))
+
+  (function ros-stop {?handle}
+    (tell ?handle {topic "/cmd_vel" :type "geometry_msgs/Twist"
+                   :linear {:x 0.0 :y 0.0 :z 0.0}
+                   :angular {:x 0.0 :y 0.0 :z 0.0}})
+    {:Status stopped})
+
+
+  ;;; §9  MANIPULATION — joint trajectory
+
+  (function ros-joint-move {?handle string ?joint real ?position real ?velocity}
+    (ask ?handle {action "/follow_joint_trajectory"
+                  :type "control_msgs/FollowJointTrajectory"
+                  :joints {?joint}
+                  :points {{:positions {?position} :velocities {?velocity} :time_from_start 1.0}}}))
+
+  (function ros-trajectory {?handle list ?joints list ?points}
+    (ask ?handle {action "/follow_joint_trajectory"
+                  :type "control_msgs/FollowJointTrajectory"
+                  :joints ?joints
+                  :points ?points}))
+
+
+  ;;; §10  SPEECH
+
+  (function ros-speak {?handle string ?text idiom ?options}
+    (tell ?handle {topic "/speech" :type "std_msgs/String" :data ?text})
+    {:Status spoken})
+
+
+  ;;; §11  DIAGNOSTICS
+
+  (function ros-diagnostics {?handle}
+    (ask ?handle {topic "/diagnostics" :type "diagnostic_msgs/DiagnosticArray"}))
+
+
+  ;;; §12  GENERIC DISPATCH
+
+  (function ros-dispatch {?handle literal ?action idiom ?params}
+    (case ?action
+      of walk           (ros-cmd-vel ?handle
+                          (ros-default (:LinearVelocity ?params) 0.3)
+                          (ros-default (:AngularVelocity ?params) 0.0))
+      of turn           (ros-cmd-vel ?handle 0.0
+                          (ros-default (:Velocity ?params) 0.5))
+      of stop           (ros-stop ?handle)
+      of navigate       (ros-navigate ?handle (:Goal ?params))
+      of joint-move     (ros-joint-move ?handle
+                          (:JointName ?params) (:Position ?params)
+                          (ros-default (:Velocity ?params) 0.5))
+      of trajectory     (ros-trajectory ?handle (:Joints ?params) (:Points ?params))
+      of speak          (ros-speak ?handle (:Text ?params) ?params)
+      of e-stop         (ros-stop ?handle)
+      else              (signal Failure :Text ($ "ROS2: unknown action" ?action))))
+
+)
