@@ -1,0 +1,174 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;;
+;;; optimus.package — Tesla Optimus Protocol Knowledge
+;;;
+;;; ╔═══════════════════════════════════════════════════════════╗
+;;; ║  PROVISIONAL — June 2026                                 ║
+;;; ║                                                          ║
+;;; ║  Tesla has not published a public SDK, ROS 2 interface,  ║
+;;; ║  or developer API for Optimus.  The robot is not yet     ║
+;;; ║  commercially available.  Enterprise SDK expected         ║
+;;; ║  Q4 2026.  ROS 2 compatibility not yet confirmed.        ║
+;;; ║                                                          ║
+;;; ║  All topic names, message types, and action servers in   ║
+;;; ║  this package are PROVISIONAL and follow standard ROS 2  ║
+;;; ║  conventions.                                            ║
+;;; ║                                                          ║
+;;; ║  This package MUST be updated when Tesla publishes       ║
+;;; ║  their official Robot SDK.                               ║
+;;; ║                                                          ║
+;;; ║  Known hardware (from AI Day presentations):             ║
+;;; ║    - 28 body actuators, 50 hand actuators (Gen 3)        ║
+;;; ║    - 8 RGB cameras (360° coverage)                       ║
+;;; ║    - 2.5D LiDAR                                          ║
+;;; ║    - IMU, 20+ force/torque sensors in joints             ║
+;;; ║    - Custom SoC (Dojo architecture)                      ║
+;;; ║    - 2.3 kWh lithium-ion battery (8-hour operation)      ║
+;;; ║    - End-to-end neural control (FSD-derived)             ║
+;;; ║                                                          ║
+;;; ║  The FSD-derived neural control means Optimus may NOT    ║
+;;; ║  use standard ROS 2 topic/action patterns.  The Tesla    ║
+;;; ║  Robot SDK may define an entirely different interface.    ║
+;;; ╚═══════════════════════════════════════════════════════════╝
+;;;
+
+(package Optimus {1 0 0}
+
+  memo "Optimus adapter — PROVISIONAL. Awaiting official Tesla Robot SDK."
+  requires {ROS}
+
+
+  ;;; §1  CONNECTION (provisional: assumes ROS 2)
+
+  (function opt-open {string ?url idiom ?options}
+    (ros-open ?url ?options))
+
+  (function opt-close {?handle}
+    (ros-close ?handle))
+
+  (function opt-status {?handle}
+    (put (ros-status ?handle) :Adapter optimus))
+
+
+  ;;; §2  VISUAL (provisional: 8 cameras, LiDAR)
+
+  (function opt-camera-front {?handle}
+    (ros-camera-read ?handle "/optimus/camera/front/image_raw"))
+
+  (function opt-camera-rear {?handle}
+    (ros-camera-read ?handle "/optimus/camera/rear/image_raw"))
+
+  (function opt-depth {?handle}
+    (ros-depth-read ?handle "/optimus/depth/front"))
+
+  (function opt-lidar {?handle}
+    (ros-point-cloud-read ?handle "/optimus/lidar"))
+
+
+  ;;; §3  HAPTIC (provisional: 20+ F/T sensors)
+
+  (function opt-grasp {?handle literal ?hand real ?force}
+    (tell ?handle {action "/optimus/grasp" :hand ?hand :force ?force})
+    {:Status grasping :Hand ?hand})
+
+  (function opt-release {?handle literal ?hand}
+    (tell ?handle {action "/optimus/release" :hand ?hand})
+    {:Status released :Hand ?hand})
+
+
+  ;;; §4  PROPRIOCEPTIVE (provisional: standard topics)
+
+  (function opt-joint-states {?handle}
+    (ask ?handle {topic "/joint_states" :type "sensor_msgs/JointState"}))
+
+  (function opt-imu {?handle}
+    (ros-imu-read ?handle "/optimus/imu"))
+
+  (function opt-battery {?handle}
+    (ros-battery-read ?handle "/optimus/battery"))
+
+
+  ;;; §5  LOCOMOTION (provisional)
+
+  (function opt-walk {?handle real ?linear real ?angular}
+    (ros-cmd-vel ?handle ?linear ?angular))
+
+  (function opt-stand {?handle}
+    (ask ?handle {action "/optimus/stand"}))
+
+  (function opt-sit {?handle}
+    (ask ?handle {action "/optimus/sit"}))
+
+
+  ;;; §6  MANIPULATION (provisional)
+
+  (function opt-reach {?handle literal ?arm idiom ?target}
+    (ask ?handle {action "/optimus/reach" :arm ?arm :target ?target
+                  :frame_id (ros-default (:FrameId ?target) "base_link")}))
+
+  (function opt-lift {?handle literal ?arm real ?height}
+    (ask ?handle {action "/optimus/lift" :arm ?arm :height ?height}))
+
+  (function opt-place {?handle literal ?arm idiom ?target}
+    (ask ?handle {action "/optimus/place" :arm ?arm :target ?target}))
+
+
+  ;;; §7  GAZE / SPEECH (provisional)
+
+  (function opt-look {?handle idiom ?target}
+    (tell ?handle {action "/optimus/look" :target ?target})
+    {:Status looking})
+
+  (function opt-speak {?handle string ?text idiom ?options}
+    (ros-speak ?handle ?text ?options))
+
+
+  ;;; §8  SYSTEM (provisional)
+
+  (function opt-e-stop {?handle}
+    (tell ?handle {service "/optimus/e_stop"})
+    {:Status stopped :Severity critical})
+
+  (function opt-set-mode {?handle literal ?mode}
+    (tell ?handle {service "/optimus/set_mode" :mode ?mode})
+    {:Status ?mode})
+
+
+  ;;; §9  DISPATCH (provisional)
+
+  (function opt-dispatch {?handle literal ?action idiom ?params}
+    (case ?action
+      of walk           (opt-walk ?handle (ros-default (:LinearVelocity ?params) 0.3) (ros-default (:AngularVelocity ?params) 0.0))
+      of turn           (ros-cmd-vel ?handle 0.0 (ros-default (:Velocity ?params) 0.5))
+      of stop           (ros-stop ?handle)
+      of stand          (opt-stand ?handle)
+      of sit            (opt-sit ?handle)
+      of navigate       (ros-navigate ?handle (:Goal ?params))
+      of look           (opt-look ?handle (:Target ?params))
+      of reach          (opt-reach ?handle (ros-default (:Arm ?params) right) (:Target ?params))
+      of grasp          (opt-grasp ?handle (ros-default (:Hand ?params) right) (ros-default (:Force ?params) 5.0))
+      of release        (opt-release ?handle (ros-default (:Hand ?params) right))
+      of lift           (opt-lift ?handle (ros-default (:Arm ?params) right) (ros-default (:Height ?params) 0.3))
+      of place          (opt-place ?handle (ros-default (:Arm ?params) right) (:Target ?params))
+      of speak          (opt-speak ?handle (:Text ?params) ?params)
+      of joint-move     (ros-joint-move ?handle (:JointName ?params) (:Position ?params) (ros-default (:Velocity ?params) 0.5))
+      of trajectory     (ros-trajectory ?handle (:Joints ?params) (:Points ?params))
+      of capture-photo  (opt-camera-front ?handle)
+      of e-stop         (opt-e-stop ?handle)
+      of set-mode       (opt-set-mode ?handle (:Mode ?params))
+      else              (ros-dispatch ?handle ?action ?params)))
+
+)
