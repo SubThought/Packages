@@ -1,0 +1,213 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;;
+;;; figure.package — Figure Humanoid Protocol Knowledge
+;;;
+;;; ╔═══════════════════════════════════════════════════════════╗
+;;; ║  PROVISIONAL — June 2026                                 ║
+;;; ║                                                          ║
+;;; ║  Figure AI has not published a public ROS 2 SDK or       ║
+;;; ║  developer API.  Figure 02 is available to enterprise    ║
+;;; ║  partners only.  All topic names, message types, and     ║
+;;; ║  action servers in this package are PROVISIONAL and      ║
+;;; ║  follow standard ROS 2 conventions.                      ║
+;;; ║                                                          ║
+;;; ║  This package MUST be updated when Figure publishes      ║
+;;; ║  their official SDK.                                     ║
+;;; ║                                                          ║
+;;; ║  Known hardware (from public demos):                     ║
+;;; ║    - 41+ DOF whole-body                                  ║
+;;; ║    - Dexterous hands with individual finger control       ║
+;;; ║    - Force/torque sensors at both wrists                 ║
+;;; ║    - Head and torso cameras                              ║
+;;; ║    - Depth sensors                                       ║
+;;; ║    - Helix VLA model for end-to-end neural control       ║
+;;; ║                                                          ║
+;;; ║  The Helix VLA model means Figure may NOT use standard   ║
+;;; ║  ROS 2 action servers for locomotion/manipulation.       ║
+;;; ║  The interface may be entirely different.                ║
+;;; ╚═══════════════════════════════════════════════════════════╝
+;;;
+
+(package Figure {1 0 0}
+
+  memo "Figure adapter — PROVISIONAL. Awaiting official Figure AI SDK."
+  requires {ROS}
+
+
+  ;;; §1  CONNECTION (provisional: assumes ROS 2)
+
+  (function fig-open {string ?url idiom ?options}
+    (ros-open ?url ?options))
+
+  (function fig-close {?handle}
+    (ros-close ?handle))
+
+  (function fig-status {?handle}
+    (put (ros-status ?handle) :Adapter figure))
+
+
+  ;;; §2  VISUAL (provisional: standard ROS 2 camera topics)
+
+  (function fig-head-camera {?handle}
+    (ros-camera-read ?handle "/figure/camera/head/image_raw"))
+
+  (function fig-torso-camera {?handle}
+    (ros-camera-read ?handle "/figure/camera/torso/image_raw"))
+
+  (function fig-depth {?handle}
+    (ros-depth-read ?handle "/figure/camera/head/depth"))
+
+
+  ;;; §3  HAPTIC (provisional: assumes standard F/T topics)
+
+  (function fig-wrist-ft {?handle literal ?side}
+    (ros-ft-read ?handle ($ "/figure/wrist/" ?side "/ft")))
+
+  (function fig-grasp {?handle literal ?hand real ?force}
+    (tell ?handle {action "/figure/grasp" :hand ?hand :force ?force})
+    {:Status grasping :Hand ?hand})
+
+  (function fig-release {?handle literal ?hand}
+    (tell ?handle {action "/figure/release" :hand ?hand})
+    {:Status released :Hand ?hand})
+
+
+  ;;; §4  PROPRIOCEPTIVE (provisional: standard topics)
+
+  (function fig-joint-states {?handle}
+    (ask ?handle {topic "/joint_states" :type "sensor_msgs/JointState"}))
+
+  (function fig-imu {?handle}
+    (ros-imu-read ?handle "/figure/imu"))
+
+  (function fig-battery {?handle}
+    (ros-battery-read ?handle "/figure/battery"))
+
+
+  ;;; §5  LOCOMOTION (provisional)
+
+  (function fig-walk {?handle real ?linear real ?angular}
+    (ros-cmd-vel ?handle ?linear ?angular))
+
+  (function fig-stand {?handle}
+    (ask ?handle {action "/figure/stand"}))
+
+  (function fig-sit {?handle}
+    (ask ?handle {action "/figure/sit"}))
+
+  (function fig-step {?handle literal ?foot real ?length real ?height}
+    (ask ?handle {action "/figure/step" :foot ?foot :step_length ?length :step_height ?height}))
+
+
+  ;;; §6  MANIPULATION (provisional)
+
+  (function fig-reach {?handle literal ?arm idiom ?target}
+    (ask ?handle {action "/figure/reach" :arm ?arm :target ?target
+                  :frame_id (ros-default (:FrameId ?target) "base_link")}))
+
+  (function fig-lift {?handle literal ?arm real ?height}
+    (ask ?handle {action "/figure/lift" :arm ?arm :height ?height}))
+
+  (function fig-place {?handle literal ?arm idiom ?target}
+    (ask ?handle {action "/figure/place" :arm ?arm :target ?target}))
+
+
+  ;;; §7  GAZE (provisional)
+
+  (function fig-look {?handle idiom ?target}
+    (tell ?handle {action "/figure/look" :target ?target
+                   :frame_id (ros-default (:FrameId ?target) "base_link")})
+    {:Status looking})
+
+  (function fig-track {?handle string ?targetId literal ?mode}
+    (tell ?handle {action "/figure/track" :target_id ?targetId :mode ?mode})
+    {:Status tracking})
+
+
+  ;;; §8  GESTURE (provisional)
+
+  (function fig-point {?handle literal ?arm idiom ?target}
+    (tell ?handle {action "/figure/point" :arm ?arm :target ?target})
+    {:Status pointing})
+
+  (function fig-wave {?handle literal ?arm integer ?reps}
+    (ask ?handle {action "/figure/wave" :arm ?arm :repetitions ?reps}))
+
+  (function fig-nod {?handle integer ?reps real ?amplitude}
+    (ask ?handle {action "/figure/nod" :repetitions ?reps :amplitude ?amplitude}))
+
+  (function fig-shake-head {?handle integer ?reps real ?amplitude}
+    (ask ?handle {action "/figure/shake_head" :repetitions ?reps :amplitude ?amplitude}))
+
+
+  ;;; §9  COMMUNICATION (provisional)
+
+  (function fig-speak {?handle string ?text idiom ?options}
+    (ros-speak ?handle ?text ?options))
+
+  (function fig-emote {?handle literal ?emotion real ?intensity integer ?duration}
+    (tell ?handle {action "/figure/emote" :emotion ?emotion :intensity ?intensity :duration ?duration})
+    {:Status emoting})
+
+
+  ;;; §10  SYSTEM (provisional)
+
+  (function fig-e-stop {?handle}
+    (tell ?handle {service "/figure/e_stop"})
+    {:Status stopped :Severity critical})
+
+  (function fig-set-mode {?handle literal ?mode}
+    (tell ?handle {service "/figure/set_mode" :mode ?mode})
+    {:Status ?mode})
+
+  (function fig-set-stiffness {?handle string ?joint real ?stiffness}
+    (tell ?handle {service "/figure/set_stiffness" :joint ?joint :stiffness ?stiffness})
+    {:Status set})
+
+
+  ;;; §11  DISPATCH (provisional)
+
+  (function fig-dispatch {?handle literal ?action idiom ?params}
+    (case ?action
+      of walk           (fig-walk ?handle (ros-default (:LinearVelocity ?params) 0.3) (ros-default (:AngularVelocity ?params) 0.0))
+      of turn           (ros-cmd-vel ?handle 0.0 (ros-default (:Velocity ?params) 0.5))
+      of stop           (ros-stop ?handle)
+      of step           (fig-step ?handle (ros-default (:Foot ?params) left) (ros-default (:StepLength ?params) 0.3) (ros-default (:StepHeight ?params) 0.05))
+      of stand          (fig-stand ?handle)
+      of sit            (fig-sit ?handle)
+      of navigate       (ros-navigate ?handle (:Goal ?params))
+      of look           (fig-look ?handle (:Target ?params))
+      of track          (fig-track ?handle (:TargetId ?params) (ros-default (:Mode ?params) smooth))
+      of reach          (fig-reach ?handle (ros-default (:Arm ?params) right) (:Target ?params))
+      of grasp          (fig-grasp ?handle (ros-default (:Hand ?params) right) (ros-default (:Force ?params) 5.0))
+      of release        (fig-release ?handle (ros-default (:Hand ?params) right))
+      of lift           (fig-lift ?handle (ros-default (:Arm ?params) right) (ros-default (:Height ?params) 0.3))
+      of place          (fig-place ?handle (ros-default (:Arm ?params) right) (:Target ?params))
+      of point          (fig-point ?handle (ros-default (:Arm ?params) right) (:Target ?params))
+      of wave           (fig-wave ?handle (ros-default (:Arm ?params) right) (ros-default (:Repetitions ?params) 3))
+      of nod            (fig-nod ?handle (ros-default (:Repetitions ?params) 2) (ros-default (:Amplitude ?params) 15.0))
+      of shake-head     (fig-shake-head ?handle (ros-default (:Repetitions ?params) 2) (ros-default (:Amplitude ?params) 20.0))
+      of speak          (fig-speak ?handle (:Text ?params) ?params)
+      of emote          (fig-emote ?handle (:Emotion ?params) (ros-default (:Intensity ?params) 0.8) (ros-default (:Duration ?params) 2000))
+      of joint-move     (ros-joint-move ?handle (:JointName ?params) (:Position ?params) (ros-default (:Velocity ?params) 0.5))
+      of trajectory     (ros-trajectory ?handle (:Joints ?params) (:Points ?params))
+      of set-stiffness  (fig-set-stiffness ?handle (ros-default (:JointName ?params) "all") (ros-default (:Stiffness ?params) 1.0))
+      of capture-photo  (fig-head-camera ?handle)
+      of e-stop         (fig-e-stop ?handle)
+      of set-mode       (fig-set-mode ?handle (:Mode ?params))
+      else              (ros-dispatch ?handle ?action ?params)))
+
+)
