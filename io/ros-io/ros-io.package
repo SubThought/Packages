@@ -1,0 +1,50 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;;
+;;; ros-io.package — ROS 2 data adapter for Premise I/O subsystem.
+;;;
+;;; Bridges Premise tell/ask to ROS 2 via rosbridge_suite WebSocket.
+;;; Provides topic subscription, topic publishing, service calls,
+;;; and action goal invocation through the standard open/close/tell/ask
+;;; intrinsics.
+;;;
+;;; Usage:
+;;;   (require ros-io from "pkg/ros-io/ros-io.package")
+;;;   (open "ros://nao-03:9090")
+;;;   (ask  Ros-1 {topic "/joint_states" :type "sensor_msgs/JointState"})
+;;;   (tell Ros-1 {topic "/cmd_vel" :linear {:x 0.5} :angular {:z 0.0}})
+;;;   (ask  Ros-1 {service "/set_mode" :mode "autonomous"})
+;;;   (ask  Ros-1 {action "/navigate_to_pose" :goal {:position {:x 3.0 :y 1.0}}})
+;;;   (close Ros-1)
+;;;
+;;; Prerequisites:
+;;;   rosbridge_suite must be running on the target robot:
+;;;     ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+;;;
+
+(package ros-io {1 0 0}
+    "ROS 2 data adapter for Premise I/O via rosbridge WebSocket."
+    (provider
+        author  "SubThought Corporation"
+        memo    "ROS 2 bridge adapter for topic, service, and action access."
+        path    "./pkg/ros-io/"
+        adapter "RosIO"
+        library "ros-io.dll"
+        scheme  "ros://")
+    (external function connect {?url ?options}
+        :Library "ros-io.dll" :Function "TryOpen"
+        :Params  {url ?url idiom ?options}
+        :Returns variant
+        "Opens a WebSocket connection to rosbridge_suite."))
