@@ -36,7 +36,7 @@
 (package G2 {1 0 0}
   "G2 adapter — verified topics from unitree_ros2 for the Unitree G1/G2 humanoid."
 
-  (require ROS from "pkg/expanse/ros.package")
+  (require ROS from "./pkg/ros/ros.package")
 
 
   ;;; §1  CONNECTION
