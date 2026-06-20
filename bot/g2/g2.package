@@ -16,66 +16,37 @@
 ;;; g2.package — Unitree G1/G2 Humanoid Protocol Knowledge
 ;;;
 ;;; Verified topics from unitree_ros2 and g1pilot packages.
-;;; All tell/ask calls go through ros-io.dll via ros-open handles.
 ;;;
-;;; The Unitree G1 EDU uses CycloneDDS natively. Topics are accessible
-;;; via unitree_ros2 or through rosbridge_suite if configured.
+;;; G1 (23-29 DOF): LeftHipPitch, LeftHipRoll, LeftHipYaw, LeftKnee,
+;;; LeftAnklePitch, LeftAnkleB, RightHipPitch, RightHipRoll, RightHipYaw,
+;;; RightKnee, RightAnklePitch, RightAnkleB, WaistYaw,
+;;; LeftShoulderPitch, LeftShoulderRoll, LeftShoulderYaw, LeftElbow,
+;;; LeftWristRoll, LeftWristPitch, LeftWristYaw,
+;;; RightShoulderPitch, RightShoulderRoll, RightShoulderYaw, RightElbow,
+;;; RightWristRoll, RightWristPitch, RightWristYaw
 ;;;
-;;; G1 (23–29 DOF depending on variant):
-;;;   LLeg:   LeftHipPitch, LeftHipRoll, LeftHipYaw, LeftKnee, LeftAnklePitch, LeftAnkleB
-;;;   RLeg:   RightHipPitch, RightHipRoll, RightHipYaw, RightKnee, RightAnklePitch, RightAnkleB
-;;;   Waist:  WaistYaw (29 DOF variant only)
-;;;   LArm:   LeftShoulderPitch, LeftShoulderRoll, LeftShoulderYaw, LeftElbow,
-;;;           LeftWristRoll, LeftWristPitch, LeftWristYaw (29 DOF variant only)
-;;;   RArm:   RightShoulderPitch, RightShoulderRoll, RightShoulderYaw, RightElbow,
-;;;           RightWristRoll, RightWristPitch, RightWristYaw (29 DOF variant only)
+;;; Verified topics: /lowstate, /lowcmd, /sportmodestate, /odommodestate,
+;;; /dex3/left/cmd, /dex3/left/state, /dex3/right/cmd, /dex3/right/state,
+;;; /arm_sdk, /loco_sdk, /gnss, /frontvideostream, /audiosender
 ;;;
-;;; Verified DDS topics (from unitree_ros2):
-;;;   /lowstate                           unitree_hg::msg::LowState       (motor pos/vel/effort + IMU)
-;;;   /lowcmd                             unitree_hg::msg::LowCmd         (motor commands)
-;;;   /sportmodestate                     unitree_go::msg::SportModeState (high-level state)
-;;;   /odommodestate                      unitree_go::msg::SportModeState (odometry mode)
-;;;   /dex3/left/cmd                      unitree_hg::msg::HandCmd        (left DEX3 hand)
-;;;   /dex3/left/state                    unitree_hg::msg::HandState
-;;;   /dex3/right/cmd                     unitree_hg::msg::HandCmd        (right DEX3 hand)
-;;;   /dex3/right/state                   unitree_hg::msg::HandState
-;;;   /arm_sdk                                                            (arm control)
-;;;   /loco_sdk                                                           (locomotion)
-;;;   /gnss                                                               (GPS)
-;;;   /frontvideostream                                                   (front camera)
-;;;   /audiosender                                                        (audio)
-;;;
-;;; Via g1pilot ROS 2 package (standard topics):
-;;;   /joint_states                       sensor_msgs/JointState
-;;;   /odom                               nav_msgs/Odometry
-;;;
-;;; Sport mode values:
-;;;   0=idle  1=balanceStand  2=pose  3=locomotion  5=lieDown
-;;;   6=jointLock  7=damping  8=recoveryStand  10=sit
+;;; Sport modes: 0=idle 1=balanceStand 2=pose 3=locomotion
+;;;              5=lieDown 6=jointLock 7=damping 8=recoveryStand 10=sit
 ;;;
 
 (package G2 {1 0 0}
+  "G2 adapter — verified topics from unitree_ros2 for the Unitree G1/G2 humanoid."
 
-  memo "G2 adapter — verified topics from unitree_ros2 for the Unitree G1/G2 humanoid."
-  requires {ROS}
+  (require ROS from "pkg/expanse/ros.package")
 
 
   ;;; §1  CONNECTION
 
-  (function g2-open {string ?url idiom ?options}
-    (ros-open ?url ?options))
-
-  (function g2-close {?handle}
-    (ros-close ?handle))
-
-  (function g2-status {?handle}
-    (put (ros-status ?handle) :Adapter g2))
+  (function g2-open {string ?url idiom ?options}  (ros-open ?url ?options))
+  (function g2-close {?handle}                    (ros-close ?handle))
+  (function g2-status {?handle}                   (put (ros-status ?handle) :Adapter g2))
 
 
-  ;;; §2  LOW-LEVEL STATE (Unitree native DDS)
-  ;;;
-  ;;; These access Unitree's native topics which include per-motor
-  ;;; position, velocity, effort, temperature, and IMU data.
+  ;;; §2  LOW-LEVEL STATE (verified: unitree_hg DDS)
 
   (function g2-lowstate {?handle}
     (ask ?handle {topic "/lowstate" :type "unitree_hg/msg/LowState"}))
@@ -87,7 +58,7 @@
     (ask ?handle {topic "/odommodestate" :type "unitree_go/msg/SportModeState"}))
 
 
-  ;;; §3  STANDARD ROS 2 STATE (via g1pilot bridge)
+  ;;; §3  STANDARD ROS 2 STATE (via g1pilot)
 
   (function g2-joint-states {?handle}
     (ask ?handle {topic "/joint_states" :type "sensor_msgs/JointState"}))
@@ -99,7 +70,7 @@
     (ros-imu-read ?handle "/imu"))
 
 
-  ;;; §4  VISUAL — front camera, LIDAR (Livox Mid-360)
+  ;;; §4  VISUAL (verified: /frontvideostream, Livox Mid-360)
 
   (function g2-front-camera {?handle}
     (ask ?handle {topic "/frontvideostream" :type "sensor_msgs/Image"}))
@@ -111,13 +82,13 @@
     (ask ?handle {topic "/livox/lidar" :type "sensor_msgs/PointCloud2"}))
 
 
-  ;;; §5  AUDITORY
+  ;;; §5  AUDITORY (verified: /audiosender)
 
   (function g2-audio {?handle}
     (ask ?handle {topic "/audiosender" :type "audio_msgs/Audio"}))
 
 
-  ;;; §6  HAPTIC — DEX3 hands (verified topics)
+  ;;; §6  HAPTIC — DEX3 hands (verified)
 
   (function g2-hand-left-state {?handle}
     (ask ?handle {topic "/dex3/left/state" :type "unitree_hg/msg/HandState"}))
@@ -138,7 +109,7 @@
     {:Status released :Hand ?hand})
 
 
-  ;;; §7  SPATIAL — GPS
+  ;;; §7  SPATIAL — GPS (verified: /gnss)
 
   (function g2-gnss {?handle}
     (ask ?handle {topic "/gnss" :type "sensor_msgs/NavSatFix"}))
@@ -161,7 +132,7 @@
     {:Status moving})
 
 
-  ;;; §9  HIGH-LEVEL LOCOMOTION (via loco_sdk / cmd_vel)
+  ;;; §9  HIGH-LEVEL LOCOMOTION (via /loco_sdk and /cmd_vel)
 
   (function g2-walk {?handle real ?linear real ?angular}
     (ros-cmd-vel ?handle ?linear ?angular))
@@ -183,7 +154,7 @@
     {:Status damping})
 
 
-  ;;; §10  ARM CONTROL (via arm_sdk)
+  ;;; §10  ARM CONTROL (via /arm_sdk)
 
   (function g2-arm-move {?handle idiom ?target}
     (tell ?handle {topic "/arm_sdk" :target ?target})
@@ -233,3 +204,5 @@
       else              (ros-dispatch ?handle ?action ?params)))
 
 )
+
+;;; -------- end of file -------
