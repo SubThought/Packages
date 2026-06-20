@@ -17,37 +17,20 @@
 ;;;
 ;;; ╔═══════════════════════════════════════════════════════════╗
 ;;; ║  PROVISIONAL — June 2026                                 ║
-;;; ║                                                          ║
-;;; ║  Figure AI has not published a public ROS 2 SDK or       ║
-;;; ║  developer API.  Figure 02 is available to enterprise    ║
-;;; ║  partners only.  All topic names, message types, and     ║
-;;; ║  action servers in this package are PROVISIONAL and      ║
-;;; ║  follow standard ROS 2 conventions.                      ║
-;;; ║                                                          ║
+;;; ║  Figure AI has not published a public ROS 2 SDK.         ║
+;;; ║  All topic names and action servers are PROVISIONAL.     ║
 ;;; ║  This package MUST be updated when Figure publishes      ║
 ;;; ║  their official SDK.                                     ║
-;;; ║                                                          ║
-;;; ║  Known hardware (from public demos):                     ║
-;;; ║    - 41+ DOF whole-body                                  ║
-;;; ║    - Dexterous hands with individual finger control       ║
-;;; ║    - Force/torque sensors at both wrists                 ║
-;;; ║    - Head and torso cameras                              ║
-;;; ║    - Depth sensors                                       ║
-;;; ║    - Helix VLA model for end-to-end neural control       ║
-;;; ║                                                          ║
-;;; ║  The Helix VLA model means Figure may NOT use standard   ║
-;;; ║  ROS 2 action servers for locomotion/manipulation.       ║
-;;; ║  The interface may be entirely different.                ║
 ;;; ╚═══════════════════════════════════════════════════════════╝
 ;;;
 
 (package Figure {1 0 0}
+  "Figure adapter — PROVISIONAL. Awaiting official Figure AI SDK."
 
-  memo "Figure adapter — PROVISIONAL. Awaiting official Figure AI SDK."
-  requires {ROS}
+  (require ROS from "pkg/expanse/ros.package")
 
 
-  ;;; §1  CONNECTION (provisional: assumes ROS 2)
+  ;;; §1  CONNECTION
 
   (function fig-open {string ?url idiom ?options}
     (ros-open ?url ?options))
@@ -59,7 +42,7 @@
     (put (ros-status ?handle) :Adapter figure))
 
 
-  ;;; §2  VISUAL (provisional: standard ROS 2 camera topics)
+  ;;; §2  VISUAL (provisional)
 
   (function fig-head-camera {?handle}
     (ros-camera-read ?handle "/figure/camera/head/image_raw"))
@@ -71,7 +54,7 @@
     (ros-depth-read ?handle "/figure/camera/head/depth"))
 
 
-  ;;; §3  HAPTIC (provisional: assumes standard F/T topics)
+  ;;; §3  HAPTIC (provisional)
 
   (function fig-wrist-ft {?handle literal ?side}
     (ros-ft-read ?handle ($ "/figure/wrist/" ?side "/ft")))
@@ -85,7 +68,7 @@
     {:Status released :Hand ?hand})
 
 
-  ;;; §4  PROPRIOCEPTIVE (provisional: standard topics)
+  ;;; §4  PROPRIOCEPTIVE (provisional)
 
   (function fig-joint-states {?handle}
     (ask ?handle {topic "/joint_states" :type "sensor_msgs/JointState"}))
@@ -211,3 +194,5 @@
       else              (ros-dispatch ?handle ?action ?params)))
 
 )
+
+;;; -------- end of file -------
