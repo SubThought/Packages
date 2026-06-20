@@ -27,7 +27,7 @@
 (package Figure {1 0 0}
   "Figure adapter — PROVISIONAL. Awaiting official Figure AI SDK."
 
-  (require ROS from "pkg/expanse/ros.package")
+  (require ROS from "./pkg/ros/ros.package")
 
 
   ;;; §1  CONNECTION
