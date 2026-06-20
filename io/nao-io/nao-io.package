@@ -20,7 +20,7 @@
 ;;; open/close/tell/ask intrinsics.
 ;;;
 ;;; Usage:
-;;;   (require nao-io from "pkg/nao-io/nao-io.package")
+;;;   (require nao-io from "./pkg/nao-io/nao-io.package")
 ;;;   (open "naoqi://nao-03:9559")
 ;;;   (ask  Nao-1 {module ALMotion :method getAngles :params {"HeadYaw" true}})
 ;;;   (tell Nao-1 {module ALMotion :method moveToward :params {0.5 0.0 0.0}})
