@@ -21,7 +21,7 @@
 ;;; intrinsics.
 ;;;
 ;;; Usage:
-;;;   (require ros-io from "pkg/ros-io/ros-io.package")
+;;;   (require ros-io from "./pkg/ros-io/ros-io.package")
 ;;;   (open "ros://nao-03:9090")
 ;;;   (ask  Ros-1 {topic "/joint_states" :type "sensor_msgs/JointState"})
 ;;;   (tell Ros-1 {topic "/cmd_vel" :linear {:x 0.5} :angular {:z 0.0}})
